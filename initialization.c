@@ -404,15 +404,6 @@ int comm_model(int ne_l, int ne_g, int*** lcc, int** local_global_index, int** g
         return -1;
     }
 
-    if (my_rank == 0) {
-        for (j = 0; j < num_procs; j++) {
-            printf("send_count_w[%d]=%d\n", j, send_count_w[j]);
-        }
-        for (j = 0; j < num_procs; j++) {
-            printf("recv_count_w[%d]=%d\n", j, recv_count_w[j]);
-        }
-    }
-
     // calculate the number of neighbors
     int p_n;
     for (i = 0; i < ne_l; i++) {  // for all elements in the process
@@ -427,116 +418,131 @@ int comm_model(int ne_l, int ne_g, int*** lcc, int** local_global_index, int** g
         }
     }
 
-    // calculate number of neighbors and
-    *neighbors_count = 0;
-    for (i = 0; i < num_procs; i++) {
-        if (send_count_w[i] != 0) {
-            *neighbors_count = *neighbors_count + 1;
-        }
-    }
-    // allocate memory and fill send_count
-    int process_map_s[*neighbors_count];
-    if ((*send_count = (int*) calloc(sizeof(int), *neighbors_count)) == NULL ) {
-        fprintf(stderr, "calloc failed for send_count_w\n");
-        return -1;
-    }
-    j = 0;
-    for (i = 0; i < num_procs; i++) {
-        if (send_count_w[i] != 0) {
-            (*send_count)[j] = send_count_w[i];
-            process_map_s[j] = i;
-            j++;
-        }
-    }
-
     // allocate memory for send_list
     if ((*send_list = (int**) calloc(sizeof(int*), num_procs)) == NULL ) {
         fprintf(stderr, "calloc failed for first dimension of send_list\n");
         return -1;
     }
     for (i = 0; i < num_procs; i++) {
-        if (((*send_list)[i] = (int*) calloc(sizeof(int), send_count_w[i])) == NULL ) {
-            fprintf(stderr, "calloc failed for second dimension of send_list\n");
-            return -1;
-        }
-
-    }
-
-    // fill the send list
-    for (k = 0; k < num_procs; k++) {  // for all neighbors
-        if (send_count_w[k] != 0) {
-            l = 0;
-            for (i = 0; i < ne_l; i++) {  // for all elements in the process
-                for (j = 0; j < 6; j++) {  // for all neighbors of this element
-                    id = (*lcc)[i][j];  // get the global id for this neighbor
-                    if (id < ne_g) {  // get whether the neighbor is an external cell
-                        p_n = (*epart)[id];  // get the process of this neighbor
-                        if (p_n == process_map_s[k]) {
-                            (*send_list)[k][l] = (*local_global_index)[i];
-                            l++;
-                            if (my_rank == 0 && k == 0) {
-                            }
-                        }
-                    }
+        if (send_count_w[i] != 0) {
+            if (((*send_list)[i] = (int*) calloc(sizeof(int), ne_g)) == NULL ) {
+                // if (((*send_list)[i] = (int*) calloc(sizeof(int), send_count_w[i])) == NULL ) {
+                fprintf(stderr, "calloc failed for second dimension of send_list\n");
+                return -1;
+            } else {
+                if (((*send_list)[i] = (int*) calloc(sizeof(int), ne_g)) == NULL ) {
+                    fprintf(stderr, "calloc failed for second dimension of send_list\n");
+                    return -1;
                 }
             }
         }
     }
 
-    // allocate memory for the recv_count (same size as send_count)
-    if ((*recv_count = (int*) calloc(sizeof(int), *neighbors_count)) == NULL ) {
+    // fill the send list
+    int *send_list_pos;
+    if ((send_list_pos = (int*) calloc(sizeof(int), num_procs)) == NULL ) {
         fprintf(stderr, "calloc failed for send_count_w\n");
         return -1;
     }
-
-    // scatter all send_count_w (becomes the according recv_count_w)
-    for (i = 0; i < num_procs; i++) {
-        MPI_Scatter(send_count_w, 1, MPI_INT, &recv_count_w[i], 1, MPI_INT, i, MPI_COMM_WORLD);
-    }
-
-    // allocate memory and fill recv_count
-    int process_map_r[*neighbors_count];
-    if ((*recv_count = (int*) calloc(sizeof(int), *neighbors_count)) == NULL ) {
-        fprintf(stderr, "calloc failed for send_count_w\n");
-        return -1;
-    }
-    j = 0;
-    for (i = 0; i < num_procs; i++) {
-        if (recv_count_w[i] != 0) {
-            (*recv_count)[j] = recv_count_w[i];
-            process_map_r[j] = i;
-            j++;
+    for (i = 0; i < ne_l; i++) {  // for all elements in the process
+        for (j = 0; j < 6; j++) {  // for all neighbors of this element
+            id = (*lcc)[i][j];  // get the global id for this neighbor
+            if (id < ne_g) {  // get whether the neighbor is an external cell
+                p_n = (*epart)[id];  // get the process of this neighbor
+                if (p_n != my_rank) {
+                    (*send_list)[p_n][send_list_pos[p_n]] = (*local_global_index)[i];
+                }
+            }
         }
     }
 
+    /* old way to fill send list
+     for (k = 0; k < num_procs; k++) {  // for all neighbors
+     if (send_count_w[k] != 0) {
+     l = 0;  // l:position in send_list_w
+     for (i = 0; i < ne_l; i++) {  // for all elements in the process
+     for (j = 0; j < 6; j++) {  // for all neighbors of this element
+     id = (*lcc)[i][j];  // get the global id for this neighbor
+     if (id < ne_g) {  // get whether the neighbor is an external cell
+     p_n = (*epart)[id];  // get the process of this neighbor
+     if (p_n == k && p_n != my_rank) {
+     (*send_list)[k][l] = (*local_global_index)[i];
+     l++;
+     //   if (my_rank==1 && k==0){
+     //     printf("l=%d\n",l);
+     // }
+     }
+     }
+     }
+     }
+     }
+     }
+     */
+    /*
+     // scatter all send_count_w (becomes the according recv_count_w)
+     for (i = 0; i < num_procs; i++) {
+     MPI_Scatter(send_count_w, 1, MPI_INT, &recv_count_w[i], 1, MPI_INT, i, MPI_COMM_WORLD);
+     }
+     */
+    // copy instead of scatter, this means send and recv count are the same
+    for (i = 0; i < num_procs; i++) {
+        recv_count_w[i] = send_count_w[i];
+    }
+/*
+    // check send and receive count_w
+    if (my_rank == 0) {
+        for (j = 0; j < num_procs; j++) {
+            printf("send_0_count_w[%d]=%d\n", j, send_count_w[j]);
+        }
+    }
+    if (my_rank == 1) {
+        for (j = 0; j < num_procs; j++) {
+            printf("send_1_count_w[%d]=%d\n", j, send_count_w[j]);
+        }
+    }
+    if (my_rank == 2) {
+
+        for (j = 0; j < num_procs; j++) {
+            printf("send_2_count_w[%d]=%d\n", j, send_count_w[j]);
+        }
+    }
+*/
     // allocate memory for recv_list
     if ((*recv_list = (int**) calloc(sizeof(int*), num_procs)) == NULL ) {
         fprintf(stderr, "calloc failed for first dimension of recv_list\n");
         return -1;
     }
-    for (i = 0; i < *neighbors_count; i++) {
-        if (((*recv_list)[i] = (int*) calloc(sizeof(int), recv_count_w[i])) == NULL ) {
-            fprintf(stderr, "calloc failed for second dimension of recv_list\n");
-            return -1;
+    for (i = 0; i < num_procs; i++) {
+        if (recv_count_w[i] != 0) {
+            if (((*recv_list)[i] = (int*) calloc(sizeof(int), ne_g)) == NULL ) {
+                //if (((*recv_list)[i] = (int*) calloc(sizeof(int), recv_count_w[i])) == NULL ) {
+                fprintf(stderr, "calloc failed for second dimension of recv_list\n");
+                return -1;
+            } else {
+                if (((*recv_list)[i] = (int*) calloc(sizeof(int), ne_g)) == NULL ) {
+                    fprintf(stderr, "calloc failed for second dimension of recv_list\n");
+                    return -1;
+                }
+            }
         }
-
     }
 
     // fill recv_list
     MPI_Request req;
-    for (i = 0; i < *neighbors_count; i++) {
-        MPI_Isend((*send_list)[i], (*send_count)[i], MPI_INT, i, 1, MPI_COMM_WORLD, &req);
+    MPI_Request reqr;
+    MPI_Status status_1;
+    MPI_Status status_2;
+
+    for (i = 0; i < num_procs; i++) {
+        MPI_Isend((*send_list)[i], send_count_w[i], MPI_INT, i, 1, MPI_COMM_WORLD, &req);
     }
-    for (i = 0; i < *neighbors_count; i++) {
-        MPI_Irecv((*recv_list)[i], (*recv_count)[i], MPI_INT, i, 1, MPI_COMM_WORLD, &req);
+    for (i = 0; i < num_procs; i++) {
+        MPI_Irecv((*recv_list)[i], recv_count_w[i], MPI_INT, i, 1, MPI_COMM_WORLD, &reqr);
     }
-    MPI_Wait(&req, MPI_STATUS_IGNORE);
+    MPI_Wait(&req, &status_1);
+    MPI_Wait(&reqr, &status_2);
     /*
-     if (my_rank==0){
-     for (i=0;i<(*send_count)[0];i++){
-     printf("recv_list[0][%d]=%d\n", i, (*recv_list)[0][i]);
-     }
-     }
+     *
      */
     return 1;
 }
