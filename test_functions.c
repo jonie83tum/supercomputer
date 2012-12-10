@@ -6,6 +6,7 @@
  */
 #include <stdlib.h>
 #include <stdio.h>
+#include <mpi.h>
 #include "util_read_files.h"
 #include "util_write_files.c"
 int test_distribution(char *file_in, char *file_vtk_out, int *local_global_index, int num_elems,
@@ -61,7 +62,10 @@ int test_distribution(char *file_in, char *file_vtk_out, int *local_global_index
 int test_communication(char *file_in, char *file_vtk_out, int *local_global_index, int num_elems,
         int neighbors_count, int* send_count, int** send_list, int* recv_count, int** recv_list) {
 
-    int i, j, k, id;
+    int i, j, id;
+    int my_rank, num_procs;
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);  // Get current process id
+    MPI_Comm_size(MPI_COMM_WORLD, &num_procs);  // get number of processes
 
     // Read the geometry from the input file
 
@@ -95,23 +99,30 @@ int test_communication(char *file_in, char *file_vtk_out, int *local_global_inde
         return -1;
     }
 
+    // set all internal cells
+
     for (i = 0; i < num_elems; i++) {
-        commlist[local_global_index[i]] = 15.0;
+        id = local_global_index[i];  // get global id of the element
+        commlist[id] = 15.0;
+
     }
+
     // set the elements which are to be sent
-    for (i = 0; i < neighbors_count; i++) {  // for all neighbors in of this process
+    for (i = 0; i < num_procs; i++) {  // for all neighbors in of this process
         for (j = 0; j < send_count[i]; j++) {  // for all elements in the list
             id = send_list[i][j];  // get global id of the element to be sent
 
             commlist[id] = 10.0;
         }
     }
-    // set the elements which are to be sent
-    for (i = 0; i < neighbors_count; i++) {  // for all neighbors in of this process
+
+    // set the elements which are to be received
+    for (i = 0; i < num_procs; i++) {  // for all neighbors in of this process
         for (j = 0; j < recv_count[i]; j++) {  // for all elements in the list
             id = recv_list[i][j];  // get global id of the element to be sent
 
             commlist[id] = 5.0;
+
         }
     }
 
@@ -122,6 +133,9 @@ int test_communication(char *file_in, char *file_vtk_out, int *local_global_inde
     // write the values to the vtk file
     vtk_append_double(file_vtk_out, "commlist", nintci, nintcf, commlist);
 
+    /*
+     *
+     */
     return 0;
 }
 

@@ -95,9 +95,9 @@ int main(int argc, char *argv[]) {
      test_distribution(file_in, file_vtk_out, local_global_index, nintcf, cgup);
      }
      */
-/*
+
     // Implement this function in test_functions.c and call it here
-    if (my_rank == 4) {
+    if (my_rank == 2) {
         // char file_vtk_out[256];
         // sprintf(&file_vtk_out, "%comm_data.vtk", out_prefix);
         char *file_vtk_out = strcat(out_prefix, "proc3.vtk");
@@ -105,7 +105,7 @@ int main(int argc, char *argv[]) {
         test_communication(file_in, file_vtk_out, local_global_index, num_elems, neighbors_count,
                 send_count, send_list, recv_count, recv_list);
     }
-*/
+
     /********** END INITIALIZATION **********/
 
     /********** START COMPUTATIONAL LOOP **********/
