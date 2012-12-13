@@ -88,16 +88,16 @@ int main(int argc, char *argv[]) {
     // num_elems is the local number of elements
 
     // char *file_vtk_out = strcat(out_prefix, "data.vtk");
-    /*
+/*
      if (my_rank == 2) {
      char file_vtk_out[256];
      sprintf(&file_vtk_out, "%s_data.vtk", out_prefix);
      test_distribution(file_in, file_vtk_out, local_global_index, nintcf, cgup);
      }
-     */
+*/
 
     // Implement this function in test_functions.c and call it here
-    if (my_rank == 2) {
+    if (my_rank == 3) {
         // char file_vtk_out[256];
         // sprintf(&file_vtk_out, "%comm_data.vtk", out_prefix);
         char *file_vtk_out = strcat(out_prefix, "proc3.vtk");
@@ -119,7 +119,8 @@ int main(int argc, char *argv[]) {
      points, elems, var, cgup, su);
      /********** END FINALIZATION **********/
 
-    /*   free(cnorm);
+    /*
+     free(cnorm);
      free(oc);
      free(var);
      free(cgup);
@@ -142,9 +143,8 @@ int main(int argc, char *argv[]) {
      free(points[i]);
      }
      free(points);
-
-
      */
+
     MPI_Finalize();  /// Cleanup MPI
 
     return 0;

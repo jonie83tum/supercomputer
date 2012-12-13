@@ -37,7 +37,6 @@ int initialization(char* file_in, char* part_type, int* nintci, int* nintcf, int
 
     // classical partitioning
     if (strcmp(part_type, "classical") == 0) {
-
         int num_elem = floor(num_elem_g / num_procs);
         if (my_rank == num_procs - 1) {
             num_elem = num_elem_g - num_elem * (num_procs - 1);
@@ -62,7 +61,6 @@ int initialization(char* file_in, char* part_type, int* nintci, int* nintcf, int
         for (i = 0; i < num_elem; i++) {
             id = my_rank * floor(num_elem_g / num_procs) + i;
             (*local_global_index)[i] = id;
-
         }
 
         // fill epart
@@ -105,6 +103,16 @@ int initialization(char* file_in, char* part_type, int* nintci, int* nintcf, int
         free(*be);
         free(*bs);
         free(*su);
+
+        // set the original pointers to the local pointers
+        *bs = BS_l;
+        *bh = BE_l;
+        *bl = BN_l;
+        *bw = BW_l;
+        *bn = BL_l;
+        *be = BH_l;
+        *bp = BP_l;
+        *su = SU_l;
 
         // allocate cgup and initialize it with zeros
         *cgup = (double*) calloc(sizeof(double), num_elem);
@@ -163,11 +171,11 @@ int initialization(char* file_in, char* part_type, int* nintci, int* nintcf, int
 
         // convert the values back to int
         // allocate memory
-        if ((*epart = (int*) calloc(sizeof(int), ne)) == NULL ) {
+        if ((*epart = (int*) calloc(sizeof(int), *nintcf - *nintci + 1)) == NULL ) {
             fprintf(stderr, "calloc failed for epart\n");
             return -1;
         }
-        if ((*npart = (int*) calloc(sizeof(int), nn)) == NULL ) {
+        if ((*npart = (int*) calloc(sizeof(int), *points_count)) == NULL ) {
             fprintf(stderr, "calloc failed for eptr\n");
             return -1;
         }
@@ -191,7 +199,7 @@ int initialization(char* file_in, char* part_type, int* nintci, int* nintcf, int
 
         // make the index mapping arrays
         // allocate memory for the mapping arrays
-        if ((*global_local_index = (int *) malloc(ne * sizeof(int))) == NULL ) {
+        if ((*global_local_index = (int *) malloc((*nintcf - *nintci + 1) * sizeof(int))) == NULL ) {
             fprintf(stderr, "malloc failed for global_local_index\n");
             return -1;
         }
@@ -230,6 +238,16 @@ int initialization(char* file_in, char* part_type, int* nintci, int* nintcf, int
         free(*be);
         free(*bs);
         free(*su);
+
+        // set the original pointers to the local pointers
+        *bs = BS_l;
+        *bh = BE_l;
+        *bl = BN_l;
+        *bw = BW_l;
+        *bn = BL_l;
+        *be = BH_l;
+        *bp = BP_l;
+        *su = SU_l;
 
         // allocate cgup and initialize it with zeros
         *cgup = (double*) calloc(sizeof(double), ne_l);
@@ -298,10 +316,13 @@ int initialization(char* file_in, char* part_type, int* nintci, int* nintcf, int
     // End partitioning
 
     // make the communication model
+
     comm_model(*nintcf, num_elem_g, lcc, local_global_index, global_local_index, neighbors_count,
             send_count, send_list, recv_count, recv_list, epart);
 
-    *var = (double*) calloc(sizeof(double), (*nextcf + 1));
+    printf("p%d after comm model\n", my_rank);
+
+    // *var = (double*) calloc(sizeof(double), (*nextcf + 1));
     // cgup oc and cnorm is a local array only
     // *cgup = (double*) calloc(sizeof(double), (*nextcf + 1));
 
@@ -309,34 +330,37 @@ int initialization(char* file_in, char* part_type, int* nintci, int* nintcf, int
     // *cnorm = (double*) calloc(sizeof(double), (*nintcf + 1));
 
     // initialize the arrays
-    for (i = 0; i <= 10; i++) {
-        (*oc)[i] = 0.0;
-        (*cnorm)[i] = 1.0;
-    }
-
-    for (i = (*nintci); i <= (*nintcf); i++) {
-        // cgup is only a local array an it is anyway initialized with calloc
-        // (*cgup)[i] = 0.0;
-        (*var)[i] = 0.0;
-    }
-
-    for (i = (*nextci); i <= (*nextcf); i++) {
-        (*var)[i] = 0.0;
-        // cgup is only a local array an it is anyway initialized with calloc
-        // (*cgup)[i] = 0.0;
-        /*do not use the global arrays any more because they are already destroyed
-         (*bs)[i] = 0.0;
-         (*be)[i] = 0.0;
-         (*bn)[i] = 0.0;
-         (*bw)[i] = 0.0;
-         (*bl)[i] = 0.0;
-         (*bh)[i] = 0.0;
-         */
-    }
+    /*
+     for (i = 0; i <= 10; i++) {
+     (*oc)[i] = 0.0;
+     (*cnorm)[i] = 1.0;
+     }
+     */
+    /*
+     for (i = (*nintci); i <= (*nintcf); i++) {
+     // cgup is only a local array an it is anyway initialized with calloc
+     // (*cgup)[i] = 0.0;
+     (*var)[i] = 0.0;
+     }
+     */
+    /*
+     for (i = (*nextci); i <= (*nextcf); i++) {
+     (*var)[i] = 0.0;
+     // cgup is only a local array an it is anyway initialized with calloc
+     // (*cgup)[i] = 0.0;
+     (*bs)[i] = 0.0;
+     (*be)[i] = 0.0;
+     (*bn)[i] = 0.0;
+     (*bw)[i] = 0.0;
+     (*bl)[i] = 0.0;
+     (*bh)[i] = 0.0;
+     }
+     */
     /*do not use bp anymore because it is already destroyed
      for (i = (*nintci); i <= (*nintcf); i++)
      (*cgup)[i] = 1.0 / ((*bp)[i]);
      */
+
     return 0;
 }
 int allocate_local_arrays(double **BS_l, double **BE_l, double **BN_l, double **BW_l, double **BL_l,
@@ -386,20 +410,17 @@ int allocate_local_arrays(double **BS_l, double **BE_l, double **BN_l, double **
 int comm_model(int ne_l, int ne_g, int*** lcc, int** local_global_index, int** global_local_index,
         int* neighbors_count, int** send_count, int*** send_list, int** recv_count,
         int*** recv_list, int** epart) {
-
-    int i, j, k, l, id;
+    int i, j, id;
     int my_rank, num_procs;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);  // Get current process id
     MPI_Comm_size(MPI_COMM_WORLD, &num_procs);  // get number of processes
 
-    // helping arrays
-    int *send_count_w, *recv_count_w;
-    // allocate memory for the helping arrays
-    if ((send_count_w = (int*) calloc(sizeof(int), num_procs)) == NULL ) {
+    // allocate memory for send_count and recv_count
+    if ((*send_count = (int*) calloc(sizeof(int), num_procs)) == NULL ) {
         fprintf(stderr, "calloc failed for send_count_w\n");
         return -1;
     }
-    if ((recv_count_w = (int*) calloc(sizeof(int), num_procs)) == NULL ) {
+    if ((*recv_count = (int*) calloc(sizeof(int), num_procs)) == NULL ) {
         fprintf(stderr, "calloc failed for recv_count_w\n");
         return -1;
     }
@@ -412,144 +433,86 @@ int comm_model(int ne_l, int ne_g, int*** lcc, int** local_global_index, int** g
             if (id < ne_g) {  // get whether the neighbor is an external cell
                 p_n = (*epart)[id];  // get the process of this neighbor
                 if (p_n != my_rank) {
-                    send_count_w[p_n]++;
+                    (*send_count)[p_n]++;
                 }
             }
         }
     }
 
-    // allocate memory for send_list
-    if ((*send_list = (int**) calloc(sizeof(int*), num_procs)) == NULL ) {
-        fprintf(stderr, "calloc failed for first dimension of send_list\n");
+    // allocating send_list
+    if ((*send_list = (int**) malloc(num_procs * sizeof(int*))) == NULL ) {
+        fprintf(stderr, "malloc failed to allocate first dimension of LCC");
         return -1;
     }
+
     for (i = 0; i < num_procs; i++) {
-        if (send_count_w[i] != 0) {
-            if (((*send_list)[i] = (int*) calloc(sizeof(int), send_count_w[i])) == NULL ) {
-                // if (((*send_list)[i] = (int*) calloc(sizeof(int), send_count_w[i])) == NULL ) {
-                fprintf(stderr, "calloc failed for second dimension of send_list\n");
-                return -1;
-            } else {
-                if (((*send_list)[i] = (int*) calloc(sizeof(int), send_count_w[i])) == NULL ) {
-                    fprintf(stderr, "calloc failed for second dimension of send_list\n");
-                    return -1;
-                }
-            }
+        if (((*send_list)[i] = (int *) malloc((*send_count)[i] * sizeof(int))) == NULL ) {
+            fprintf(stderr, "malloc failed to allocate second dimension of LCC\n");
+            return -1;
         }
     }
 
-    // allocate memory for the send_list
+    // allocate memory for the send_list_position
     int *send_list_pos;
     if ((send_list_pos = (int*) calloc(sizeof(int), num_procs)) == NULL ) {
         fprintf(stderr, "calloc failed for send_count_w\n");
         return -1;
     }
+
     // fill the send list
+    int p;
     for (i = 0; i < ne_l; i++) {  // for all elements in the process
         for (j = 0; j < 6; j++) {  // for all neighbors of this element
             id = (*lcc)[i][j];  // get the global id for this neighbor
             if (id < ne_g) {  // get whether the neighbor is an external cell
                 p_n = (*epart)[id];  // get the process of this neighbor
                 if (p_n != my_rank) {  // check whether it is an element of another process
-                    (*send_list)[p_n][send_list_pos[p_n]] = (*local_global_index)[i];  // write element id to send_list
+                    p = send_list_pos[p_n];
+                    (*send_list)[p_n][p] = (*local_global_index)[i];
                     send_list_pos[p_n]++;  // increase send_list_count
-
+                    if (my_rank == 2) {
+                    }
                 }
             }
         }
     }
 
-    /* old way to fill send list
-     for (k = 0; k < num_procs; k++) {  // for all neighbors
-     if (send_count_w[k] != 0) {
-     l = 0;  // l:position in send_list_w
-     for (i = 0; i < ne_l; i++) {  // for all elements in the process
-     for (j = 0; j < 6; j++) {  // for all neighbors of this element
-     id = (*lcc)[i][j];  // get the global id for this neighbor
-     if (id < ne_g) {  // get whether the neighbor is an external cell
-     p_n = (*epart)[id];  // get the process of this neighbor
-     if (p_n == k && p_n != my_rank) {
-     (*send_list)[k][l] = (*local_global_index)[i];
-     l++;
-     //   if (my_rank==1 && k==0){
-     //     printf("l=%d\n",l);
-     // }
-     }
-     }
-     }
-     }
-     }
-     }
-     */
-    /*
-     // scatter all send_count_w (becomes the according recv_count_w)
-     for (i = 0; i < num_procs; i++) {
-     MPI_Scatter(send_count_w, 1, MPI_INT, &recv_count_w[i], 1, MPI_INT, i, MPI_COMM_WORLD);
-     }
-     */
-// copy instead of scatter, this means send and recv count are the same
+    // copy send count to receive count because it is the same
     for (i = 0; i < num_procs; i++) {
-        recv_count_w[i] = send_count_w[i];
+        (*recv_count)[i] = (*send_count)[i];
     }
-    /*
-     // check send and receive count_w
-     if (my_rank == 0) {
-     for (j = 0; j < num_procs; j++) {
-     printf("send_0_count_w[%d]=%d\n", j, send_count_w[j]);
-     }
-     }
-     if (my_rank == 1) {
-     for (j = 0; j < num_procs; j++) {
-     printf("send_1_count_w[%d]=%d\n", j, send_count_w[j]);
-     }
-     }
-     if (my_rank == 2) {
 
-     for (j = 0; j < num_procs; j++) {
-     printf("send_2_count_w[%d]=%d\n", j, send_count_w[j]);
-     }
-     }
-     */
-// allocate memory for recv_list
-    if ((*recv_list = (int**) calloc(sizeof(int*), num_procs)) == NULL ) {
-        fprintf(stderr, "calloc failed for first dimension of recv_list\n");
+    // allocating recv_list
+    if ((*recv_list = (int**) malloc(num_procs * sizeof(int*))) == NULL ) {
+        fprintf(stderr, "malloc failed to allocate first dimension of LCC");
         return -1;
     }
+
     for (i = 0; i < num_procs; i++) {
-        if (recv_count_w[i] != 0) {
-            if (((*recv_list)[i] = (int*) calloc(sizeof(int), recv_count_w[i])) == NULL ) {
-                //if (((*recv_list)[i] = (int*) calloc(sizeof(int), recv_count_w[i])) == NULL ) {
-                fprintf(stderr, "calloc failed for second dimension of recv_list\n");
-                return -1;
-            } else {
-                if (((*recv_list)[i] = (int*) calloc(sizeof(int), recv_count_w[i])) == NULL ) {
-                    fprintf(stderr, "calloc failed for second dimension of recv_list\n");
-                    return -1;
-                }
-            }
+        if (((*recv_list)[i] = (int *) malloc((*recv_count)[i] * sizeof(int))) == NULL ) {
+            fprintf(stderr, "malloc failed to allocate second dimension of LCC\n");
+            return -1;
         }
     }
 
-// fill recv_list
-    MPI_Request req;
-    MPI_Request reqr;
-    MPI_Status status_1;
-    MPI_Status status_2;
+    MPI_Request req_s[num_procs];
+    MPI_Request req_r[num_procs];
+    MPI_Status status_s[num_procs];
+    MPI_Status status_r[num_procs];
 
     for (i = 0; i < num_procs; i++) {
-        MPI_Isend(&(*send_list)[i][0], send_count_w[i], MPI_INT, i, 1, MPI_COMM_WORLD, &req);
+
+        MPI_Isend(&(*send_list)[i][0], (*send_count)[i], MPI_INT, i, 1, MPI_COMM_WORLD, &req_s[i]);
+
     }
-    MPI_Wait(&req, &status_1);
+
     for (i = 0; i < num_procs; i++) {
-        MPI_Irecv(&(*recv_list)[i][0], recv_count_w[i], MPI_INT, i, 1, MPI_COMM_WORLD, &reqr);
+
+        MPI_Irecv(&(*recv_list)[i][0], (*recv_count)[i], MPI_INT, i, 1, MPI_COMM_WORLD, &req_r[i]);
+
     }
+    MPI_Waitall(num_procs, req_s, status_s);
+    MPI_Waitall(num_procs, req_r, status_r);
 
-    MPI_Wait(&reqr, &status_2);
-
-    *send_count = send_count_w;
-    *recv_count = recv_count_w;
-    /*
-     *
-     */
     return 1;
 }

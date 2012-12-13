@@ -47,7 +47,6 @@ int test_distribution(char *file_in, char *file_vtk_out, int *local_global_index
     for (i = 0; i < num_elems; i++) {
         ind = local_global_index[i];
         distr[ind] = cgup[i];
-        // distr[*local_global_index[i]] = cgup[i];
     }
 
     // write the vtk header
@@ -61,7 +60,6 @@ int test_distribution(char *file_in, char *file_vtk_out, int *local_global_index
 
 int test_communication(char *file_in, char *file_vtk_out, int *local_global_index, int num_elems,
         int neighbors_count, int* send_count, int** send_list, int* recv_count, int** recv_list) {
-
     int i, j, id;
     int my_rank, num_procs;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);  // Get current process id
@@ -100,18 +98,15 @@ int test_communication(char *file_in, char *file_vtk_out, int *local_global_inde
     }
 
     // set all internal cells
-
     for (i = 0; i < num_elems; i++) {
         id = local_global_index[i];  // get global id of the element
         commlist[id] = 15.0;
-
     }
 
     // set the elements which are to be sent
     for (i = 0; i < num_procs; i++) {  // for all neighbors in of this process
         for (j = 0; j < send_count[i]; j++) {  // for all elements in the list
             id = send_list[i][j];  // get global id of the element to be sent
-
             commlist[id] = 10.0;
         }
     }
@@ -120,10 +115,12 @@ int test_communication(char *file_in, char *file_vtk_out, int *local_global_inde
     for (i = 0; i < num_procs; i++) {  // for all neighbors in of this process
         for (j = 0; j < recv_count[i]; j++) {  // for all elements in the list
             id = recv_list[i][j];  // get global id of the element to be sent
-
             commlist[id] = 5.0;
-
         }
+    }
+
+    for (i = 0; i < num_procs; i++) {
+        printf("recv_count[%d]=%d\n", i, recv_count[i]);
     }
 
     // write the vtk header
@@ -132,7 +129,6 @@ int test_communication(char *file_in, char *file_vtk_out, int *local_global_inde
             elems);
     // write the values to the vtk file
     vtk_append_double(file_vtk_out, "commlist", nintci, nintcf, commlist);
-
     /*
      *
      */
