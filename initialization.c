@@ -19,7 +19,8 @@ int initialization(char* file_in, char* part_type, int* nintci, int* nintcf, int
         double** bh, double** bp, double** su, int* points_count, int*** points, int** elems,
         double** var, double** cgup, double** oc, double** cnorm, int** local_global_index,
         int** global_local_index, int* neighbors_count, int** send_count, int*** send_list,
-        int** recv_count, int*** recv_list, int** epart, int** npart, int* objval) {
+        int** recv_count, int*** recv_list, int** epart, int** npart, int* objval,
+        int* num_global_elem) {
     /********** START INITIALIZATION **********/
 
     int i = 0;
@@ -34,6 +35,7 @@ int initialization(char* file_in, char* part_type, int* nintci, int* nintcf, int
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);  // Get current process id
     MPI_Comm_size(MPI_COMM_WORLD, &num_procs);  // get number of processes
     int num_elem_g = *nintcf - *nintci + 1;
+    *num_global_elem=num_elem_g;
 
     // classical partitioning
     if (strcmp(part_type, "classical") == 0) {
@@ -82,18 +84,36 @@ int initialization(char* file_in, char* part_type, int* nintci, int* nintcf, int
         allocate_local_arrays(&BS_l, &BE_l, &BN_l, &BW_l, &BL_l, &BH_l, &BP_l, &SU_l, num_elem);
 
         // copy the values from the global to the local arrays
-        int index;
-        for (i = 0; i < num_elem; i++) {
-            index = my_rank * floor(num_elem_g / num_procs) + i;
-            BS_l[i] = (*bs)[index];
-            BE_l[i] = (*be)[index];
-            BN_l[i] = (*bn)[index];
-            BW_l[i] = (*bw)[index];
-            BL_l[i] = (*bl)[index];
-            BH_l[i] = (*bh)[index];
-            BP_l[i] = (*bp)[index];
-            SU_l[i] = (*su)[index];
+        j = 0;
+        for (i = 0; i < num_elem_g; i++) {
+            if (my_rank == (*epart)[i]) {
+                (*local_global_index)[j] = i;
+                BS_l[j] = (*bs)[i];
+                BE_l[j] = (*be)[i];
+                BN_l[j] = (*bn)[i];
+                BW_l[j] = (*bw)[i];
+                BL_l[j] = (*bl)[i];
+                BH_l[j] = (*bh)[i];
+                BP_l[j] = (*bp)[i];
+                SU_l[j] = (*su)[i];
+                j++;
+            }
         }
+        /*
+         int index;
+         for (i = 0; i < num_elem; i++) {
+         index = my_rank * floor(num_elem_g / num_procs) + i;
+         BS_l[i] = (*bs)[index];
+         BE_l[i] = (*be)[index];
+         BN_l[i] = (*bn)[index];
+         BW_l[i] = (*bw)[index];
+         BL_l[i] = (*bl)[index];
+         BH_l[i] = (*bh)[index];
+         BP_l[i] = (*bp)[index];
+         SU_l[i] = (*su)[index];
+         }
+         */
+
         // free the resources of the global arrays
         free(*bp);
         free(*bh);
@@ -106,11 +126,11 @@ int initialization(char* file_in, char* part_type, int* nintci, int* nintcf, int
 
         // set the original pointers to the local pointers
         *bs = BS_l;
-        *bh = BE_l;
-        *bl = BN_l;
+        *bh = BH_l;
+        *bl = BL_l;
         *bw = BW_l;
-        *bn = BL_l;
-        *be = BH_l;
+        *bn = BN_l;
+        *be = BE_l;
         *bp = BP_l;
         *su = SU_l;
 
@@ -123,7 +143,7 @@ int initialization(char* file_in, char* part_type, int* nintci, int* nintcf, int
         *oc = (double*) calloc(sizeof(double), num_elem);
         *cnorm = (double*) calloc(sizeof(double), num_elem);
 
-        *nintcf = num_elem;
+        *nintcf = num_elem - 1;
 
     } else if (strcmp(part_type, "dual") == 0) {
         // distribution with METIS
@@ -241,11 +261,11 @@ int initialization(char* file_in, char* part_type, int* nintci, int* nintcf, int
 
         // set the original pointers to the local pointers
         *bs = BS_l;
-        *bh = BE_l;
-        *bl = BN_l;
+        *bh = BH_l;
+        *bl = BL_l;
         *bw = BW_l;
-        *bn = BL_l;
-        *be = BH_l;
+        *bn = BN_l;
+        *be = BE_l;
         *bp = BP_l;
         *su = SU_l;
 
@@ -258,8 +278,10 @@ int initialization(char* file_in, char* part_type, int* nintci, int* nintcf, int
         *oc = (double*) calloc(sizeof(double), ne_l);
         *cnorm = (double*) calloc(sizeof(double), ne_l);
 
-        *nintcf = ne_l;
+        *nintcf = ne_l - 1;
     }
+    *nintci = 0;
+
     // make the global_local_index
     int *gl_lo;
     if ((gl_lo = (int*) calloc(sizeof(int), num_procs)) == NULL ) {
@@ -274,12 +296,12 @@ int initialization(char* file_in, char* part_type, int* nintci, int* nintcf, int
 
     int **lcc_l;
     // allocating the local LCC array
-    if ((lcc_l = (int**) malloc((*nintcf) * sizeof(int*))) == NULL ) {
+    if ((lcc_l = (int**) malloc(((*nintcf) + 1) * sizeof(int*))) == NULL ) {
         fprintf(stderr, "malloc failed to allocate first dimension of lcc_l");
         return -1;
     }
 
-    for (i = 0; i < *nintcf; i++) {
+    for (i = 0; i <= *nintcf; i++) {
         if ((lcc_l[i] = (int*) malloc(6 * sizeof(int))) == NULL ) {
             fprintf(stderr, "malloc failed to allocate second dimension of lcc_l\n");
             return -1;
@@ -317,10 +339,8 @@ int initialization(char* file_in, char* part_type, int* nintci, int* nintcf, int
 
     // make the communication model
 
-    comm_model(*nintcf, num_elem_g, lcc, local_global_index, global_local_index, neighbors_count,
-            send_count, send_list, recv_count, recv_list, epart);
-
-    printf("p%d after comm model\n", my_rank);
+    comm_model(*nintcf + 1, num_elem_g, lcc, local_global_index, global_local_index,
+            neighbors_count, send_count, send_list, recv_count, recv_list, epart);
 
     // *var = (double*) calloc(sizeof(double), (*nextcf + 1));
     // cgup oc and cnorm is a local array only
@@ -330,24 +350,22 @@ int initialization(char* file_in, char* part_type, int* nintci, int* nintcf, int
     // *cnorm = (double*) calloc(sizeof(double), (*nintcf + 1));
 
     // initialize the arrays
+
+    for (i = 0; i <= 10; i++) {
+        // (*oc)[i] = 0.0;
+        (*cnorm)[i] = 1.0;  // how to distribute???
+    }
     /*
-     for (i = 0; i <= 10; i++) {
-     (*oc)[i] = 0.0;
-     (*cnorm)[i] = 1.0;
-     }
-     */
-    /*
-     for (i = (*nintci); i <= (*nintcf); i++) {
-     // cgup is only a local array an it is anyway initialized with calloc
-     // (*cgup)[i] = 0.0;
+     for (i = 0; i < (*nintcf); i++) {
+
+     (*cgup)[i] = 0.0;
      (*var)[i] = 0.0;
      }
-     */
-    /*
+
      for (i = (*nextci); i <= (*nextcf); i++) {
      (*var)[i] = 0.0;
-     // cgup is only a local array an it is anyway initialized with calloc
-     // (*cgup)[i] = 0.0;
+
+     (*cgup)[i] = 0.0;
      (*bs)[i] = 0.0;
      (*be)[i] = 0.0;
      (*bn)[i] = 0.0;
@@ -356,10 +374,8 @@ int initialization(char* file_in, char* part_type, int* nintci, int* nintcf, int
      (*bh)[i] = 0.0;
      }
      */
-    /*do not use bp anymore because it is already destroyed
-     for (i = (*nintci); i <= (*nintcf); i++)
-     (*cgup)[i] = 1.0 / ((*bp)[i]);
-     */
+    for (i = 0; i <= (*nintcf); i++)
+        (*cgup)[i] = 1.0 / ((*bp)[i]);
 
     return 0;
 }

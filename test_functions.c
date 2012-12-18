@@ -119,19 +119,13 @@ int test_communication(char *file_in, char *file_vtk_out, int *local_global_inde
         }
     }
 
-    for (i = 0; i < num_procs; i++) {
-        printf("recv_count[%d]=%d\n", i, recv_count[i]);
-    }
-
     // write the vtk header
     const char experiment_name[] = "test for communication";
     vtk_write_unstr_grid_header(experiment_name, file_vtk_out, nintci, nintcf, points_count, points,
             elems);
     // write the values to the vtk file
     vtk_append_double(file_vtk_out, "commlist", nintci, nintcf, commlist);
-    /*
-     *
-     */
+
     return 0;
 }
 

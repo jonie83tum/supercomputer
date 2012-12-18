@@ -13,7 +13,8 @@ int initialization(char* file_in, char* part_type, int* nintci, int* nintcf, int
         double** bh, double** bp, double** su, int* points_count, int*** points, int** elems,
         double** var, double** cgup, double** oc, double** cnorm, int** local_global_index,
         int** global_local_index, int* neighbors_count, int** send_count, int*** send_list,
-        int** recv_count, int*** recv_list, int** epart, int** npart, int* objval);
+        int** recv_count, int*** recv_list, int** epart, int** npart, int* objval,
+        int* num_global_elem);
 
 #endif /* INITIALIZATION_H_ */
 
