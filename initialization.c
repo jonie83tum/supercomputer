@@ -35,7 +35,7 @@ int initialization(char* file_in, char* part_type, int* nintci, int* nintcf, int
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);  // Get current process id
     MPI_Comm_size(MPI_COMM_WORLD, &num_procs);  // get number of processes
     int num_elem_g = *nintcf - *nintci + 1;
-    *num_global_elem=num_elem_g;
+    *num_global_elem = num_elem_g;
 
     // classical partitioning
     if (strcmp(part_type, "classical") == 0) {
@@ -340,9 +340,9 @@ int initialization(char* file_in, char* part_type, int* nintci, int* nintcf, int
     // make the communication model
 
     comm_model(*nintcf + 1, num_elem_g, lcc, local_global_index, global_local_index,
-            neighbors_count, send_count, send_list, recv_count, recv_list, epart);
+            neighbors_count, send_count, send_list, recv_count, recv_list, epart, nextci, nextcf);
 
-    // *var = (double*) calloc(sizeof(double), (*nextcf + 1));
+    *var = (double*) calloc(sizeof(double), (*nextcf + 1));
     // cgup oc and cnorm is a local array only
     // *cgup = (double*) calloc(sizeof(double), (*nextcf + 1));
 
@@ -425,8 +425,8 @@ int allocate_local_arrays(double **BS_l, double **BE_l, double **BN_l, double **
 
 int comm_model(int ne_l, int ne_g, int*** lcc, int** local_global_index, int** global_local_index,
         int* neighbors_count, int** send_count, int*** send_list, int** recv_count,
-        int*** recv_list, int** epart) {
-    int i, j, id;
+        int*** recv_list, int** epart, int* nextci, int* nextcf) {
+    int i, j, id, k, total_send_recv, ext_pos;
     int my_rank, num_procs;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);  // Get current process id
     MPI_Comm_size(MPI_COMM_WORLD, &num_procs);  // get number of processes
@@ -468,15 +468,55 @@ int comm_model(int ne_l, int ne_g, int*** lcc, int** local_global_index, int** g
         }
     }
 
+    // allocating recv_list
+
+    if ((*recv_list = (int**) malloc(num_procs * sizeof(int*))) == NULL ) {
+        fprintf(stderr, "malloc failed to allocate first dimension of LCC");
+        return -1;
+    }
+
+    for (i = 0; i < num_procs; i++) {
+        if (((*recv_list)[i] = (int *) malloc((*send_count)[i] * sizeof(int))) == NULL ) {
+            fprintf(stderr, "malloc failed to allocate second dimension of LCC\n");
+            return -1;
+        }
+    }
+
+    // create a new lcc array
+    // this array maps the neighbors in the following order:
+    // internal cells[ne_l]; ghost cells[total_send_recv]; external cells[1]
+    int **lcc_n;
+    // allocating the new LCC array
+    if ((lcc_n = (int**) malloc(ne_l * sizeof(int*))) == NULL ) {
+        fprintf(stderr, "malloc failed to allocate first dimension of lcc_l");
+        return -1;
+    }
+    for (i = 0; i < ne_l; i++) {
+        if ((lcc_n[i] = (int*) malloc(6 * sizeof(int))) == NULL ) {
+            fprintf(stderr, "malloc failed to allocate second dimension of lcc_l\n");
+            return -1;
+        }
+    }
+
     // allocate memory for the send_list_position
     int *send_list_pos;
     if ((send_list_pos = (int*) calloc(sizeof(int), num_procs)) == NULL ) {
         fprintf(stderr, "calloc failed for send_count_w\n");
         return -1;
     }
+    // copy send count to receive count because it is the same
+    total_send_recv = 0;
+    for (i = 0; i < num_procs; i++) {
+        (*recv_count)[i] = (*send_count)[i];
+        total_send_recv = total_send_recv + (*send_count)[i];
+    }
+    *nextci=ne_l;
+    *nextcf=ne_l+total_send_recv-1;
 
     // fill the send list
     int p;
+    k = 0;
+    ext_pos = ne_l + total_send_recv;
     for (i = 0; i < ne_l; i++) {  // for all elements in the process
         for (j = 0; j < 6; j++) {  // for all neighbors of this element
             id = (*lcc)[i][j];  // get the global id for this neighbor
@@ -485,50 +525,61 @@ int comm_model(int ne_l, int ne_g, int*** lcc, int** local_global_index, int** g
                 if (p_n != my_rank) {  // check whether it is an element of another process
                     p = send_list_pos[p_n];
                     (*send_list)[p_n][p] = (*local_global_index)[i];
+                    (*recv_list)[p_n][p] = id;
                     send_list_pos[p_n]++;  // increase send_list_count
-                    if (my_rank == 2) {
-                    }
+                    lcc_n[i][j] = ne_l + k; // this is not correct
+                    k++;
+                } else {
+                    lcc_n[i][j] = (*global_local_index)[id];
                 }
+            } else {
+                lcc_n[i][j] = ext_pos;
             }
         }
     }
 
-    // copy send count to receive count because it is the same
-    for (i = 0; i < num_procs; i++) {
-        (*recv_count)[i] = (*send_count)[i];
+    // free the memory of the global LCC vector
+    for (int i = 0; i < ne_l; i++) {
+        free((*lcc)[i]);
     }
+    free(*lcc);
+    // set the original pointer to the new lcc pointer
+    *lcc = lcc_n;
 
-    // allocating recv_list
-    if ((*recv_list = (int**) malloc(num_procs * sizeof(int*))) == NULL ) {
-        fprintf(stderr, "malloc failed to allocate first dimension of LCC");
-        return -1;
-    }
+    /*
+     // allocating recv_list
+     if ((*recv_list = (int**) malloc(num_procs * sizeof(int*))) == NULL ) {
+     fprintf(stderr, "malloc failed to allocate first dimension of LCC");
+     return -1;
+     }
 
-    for (i = 0; i < num_procs; i++) {
-        if (((*recv_list)[i] = (int *) malloc((*recv_count)[i] * sizeof(int))) == NULL ) {
-            fprintf(stderr, "malloc failed to allocate second dimension of LCC\n");
-            return -1;
-        }
-    }
+     for (i = 0; i < num_procs; i++) {
+     if (((*recv_list)[i] = (int *) malloc((*recv_count)[i] * sizeof(int))) == NULL ) {
+     fprintf(stderr, "malloc failed to allocate second dimension of LCC\n");
+     return -1;
+     }
+     }
+     */
+    /*
+     MPI_Request req_s[num_procs];
+     MPI_Request req_r[num_procs];
+     MPI_Status status_s[num_procs];
+     MPI_Status status_r[num_procs];
 
-    MPI_Request req_s[num_procs];
-    MPI_Request req_r[num_procs];
-    MPI_Status status_s[num_procs];
-    MPI_Status status_r[num_procs];
+     for (i = 0; i < num_procs; i++) {
 
-    for (i = 0; i < num_procs; i++) {
+     MPI_Isend(&(*send_list)[i][0], (*send_count)[i], MPI_INT, i, 1, MPI_COMM_WORLD, &req_s[i]);
 
-        MPI_Isend(&(*send_list)[i][0], (*send_count)[i], MPI_INT, i, 1, MPI_COMM_WORLD, &req_s[i]);
+     }
 
-    }
+     for (i = 0; i < num_procs; i++) {
 
-    for (i = 0; i < num_procs; i++) {
+     MPI_Irecv(&(*recv_list)[i][0], (*recv_count)[i], MPI_INT, i, 1, MPI_COMM_WORLD, &req_r[i]);
 
-        MPI_Irecv(&(*recv_list)[i][0], (*recv_count)[i], MPI_INT, i, 1, MPI_COMM_WORLD, &req_r[i]);
-
-    }
-    MPI_Waitall(num_procs, req_s, status_s);
-    MPI_Waitall(num_procs, req_r, status_r);
+     }
+     MPI_Waitall(num_procs, req_s, status_s);
+     MPI_Waitall(num_procs, req_r, status_r);
+     */
 
     return 1;
 }

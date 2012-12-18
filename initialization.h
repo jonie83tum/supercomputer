@@ -25,4 +25,4 @@ int allocate_local_arrays(double **BS, double **BE, double **BN, double **BW, do
 
 int comm_model(int ne_l, int ne_g, int*** lcc, int** local_global_index, int** global_local_index,
         int* neighbors_count, int** send_count, int*** send_list, int** recv_count,
-        int*** recv_list, int** epart);
+        int*** recv_list, int** epart, int* nextci, int* nextcf);

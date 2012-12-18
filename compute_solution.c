@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include "mpi.h"
 
 int compute_solution(const int max_iters, int nintci, int nintcf, int nextcf, int** lcc, double* bp,
         double* bs, double* bw, double* bl, double* bn, double* be, double* bh, double* cnorm,
@@ -20,6 +21,11 @@ int compute_solution(const int max_iters, int nintci, int nintcf, int nextcf, in
     int nor = 1;
     int nor1 = nor - 1;
     int nc = 0;
+
+    int my_rank, num_procs;
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);  // Get current process id
+    MPI_Comm_size(MPI_COMM_WORLD, &num_procs);  // get number of processes
+    MPI_Datatype type;
 
     // allocate arrays used in gccg
     int nomax = 3;
@@ -44,14 +50,15 @@ int compute_solution(const int max_iters, int nintci, int nintcf, int nextcf, in
 
     // calcualte size of direc vectors (internal cells + ghost cells + neighboring external cells)
 
-
     // the computation vectors
-    double *direc1 = (double *) calloc(sizeof(double), (nextcf + 1));
+    double *direc1 = (double *) calloc(sizeof(double), (nextcf + 2));  // +2 because last entry = 0 (ext cell)
     double *direc2 = (double *) calloc(sizeof(double), (nextcf + 1));
     double *adxor1 = (double *) calloc(sizeof(double), (nintcf + 1));
     double *adxor2 = (double *) calloc(sizeof(double), (nintcf + 1));
     double *dxor1 = (double *) calloc(sizeof(double), (nintcf + 1));
     double *dxor2 = (double *) calloc(sizeof(double), (nintcf + 1));
+
+
 
     while (iter < max_iters) {
         //  START COMP PHASE 1
@@ -59,6 +66,8 @@ int compute_solution(const int max_iters, int nintci, int nintcf, int nextcf, in
         for (nc = nintci; nc <= nintcf; nc++) {
             direc1[nc] = direc1[nc] + resvec[nc] * cgup[nc];
         }
+
+        // send and receive the ghost cells
 
         // compute new guess (approximation) for direc
         for (nc = nintci; nc <= nintcf; nc++) {
@@ -169,9 +178,9 @@ int compute_solution(const int max_iters, int nintci, int nintcf, int nextcf, in
     free(adxor2);
     free(dxor1);
     free(dxor2);
-/*
- *
- */
+    /*
+     *
+     */
     return iter;
 }
 

@@ -18,7 +18,7 @@
 int main(int argc, char *argv[]) {
     int my_rank, num_procs;
 
-    const int max_iters = 10000;  /// maximum number of iteration to perform
+    const int max_iters = 3;  /// maximum number of iteration to perform
 
     /** Simulation parameters parsed from the input datasets */
     int nintci, nintcf;  /// internal cells start and end index
@@ -58,7 +58,7 @@ int main(int argc, char *argv[]) {
     int* epart;  /// partition vector for the elements of the mesh
     int* npart;  /// partition vector for the points (nodes) of the mesh
     int objval;  /// resulting edgecut of total communication volume (classical distrib->zeros)
-    int num_global_elem; // global number on internal elements
+    int num_global_elem;  // global number on internal elements
 
     MPI_Init(&argc, &argv);  /// Start MPI
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);  /// Get current process id
@@ -96,9 +96,9 @@ int main(int argc, char *argv[]) {
      test_distribution(file_in, file_vtk_out, local_global_index, nintcf, cgup);
      }
      */
-    /*
+
      // Implement this function in test_functions.c and call it here
-     if (my_rank == 3) {
+     if (my_rank == 0) {
      // char file_vtk_out[256];
      // sprintf(&file_vtk_out, "%comm_data.vtk", out_prefix);
      char *file_vtk_out = strcat(out_prefix, "proc3.vtk");
@@ -106,11 +106,10 @@ int main(int argc, char *argv[]) {
      test_communication(file_in, file_vtk_out, local_global_index, num_elems, neighbors_count,
      send_count, send_list, recv_count, recv_list);
      }
-     */
+
     /********** END INITIALIZATION **********/
 
     /********** START COMPUTATIONAL LOOP **********/
-
 
     int total_iters = compute_solution(max_iters, nintci, nintcf, nextcf, lcc, bp, bs, bw, bl, bn,
             be, bh, cnorm, var, su, cgup, &residual_ratio, local_global_index, global_local_index,
