@@ -342,7 +342,7 @@ int initialization(char* file_in, char* part_type, int* nintci, int* nintcf, int
     comm_model(*nintcf + 1, num_elem_g, lcc, local_global_index, global_local_index,
             neighbors_count, send_count, send_list, recv_count, recv_list, epart, nextci, nextcf);
 
-    *var = (double*) calloc(sizeof(double), (*nextcf + 1));
+    *var = (double*) calloc(sizeof(double), (*nintcf + 1));
     // cgup oc and cnorm is a local array only
     // *cgup = (double*) calloc(sizeof(double), (*nextcf + 1));
 
@@ -353,7 +353,7 @@ int initialization(char* file_in, char* part_type, int* nintci, int* nintcf, int
 
     for (i = 0; i <= 10; i++) {
         // (*oc)[i] = 0.0;
-        (*cnorm)[i] = 1.0;  // how to distribute???
+        (*cnorm)[i] = 1.0;  // only the firt 3 elements have to be one on each proseccor
     }
     /*
      for (i = 0; i < (*nintcf); i++) {
@@ -440,6 +440,12 @@ int comm_model(int ne_l, int ne_g, int*** lcc, int** local_global_index, int** g
         fprintf(stderr, "calloc failed for recv_count_w\n");
         return -1;
     }
+    // allocate memory for send_count_cum (cumulative)
+    int *send_count_cum;
+    if ((send_count_cum = (int*) calloc(sizeof(int), num_procs)) == NULL ) {
+        fprintf(stderr, "calloc failed for send_count_cum\n");
+        return -1;
+    }
 
     // calculate the number of neighbors
     int p_n;
@@ -509,14 +515,18 @@ int comm_model(int ne_l, int ne_g, int*** lcc, int** local_global_index, int** g
     for (i = 0; i < num_procs; i++) {
         (*recv_count)[i] = (*send_count)[i];
         total_send_recv = total_send_recv + (*send_count)[i];
+        if (i != 0) {
+            send_count_cum[i] = send_count_cum[i - 1] + (*send_count)[i - 1];
+        }
     }
-    *nextci=ne_l;
-    *nextcf=ne_l+total_send_recv-1;
+
+    *nextci = ne_l;
+    *nextcf = ne_l + total_send_recv - 1;
 
     // fill the send list
     int p;
     k = 0;
-    ext_pos = ne_l + total_send_recv;
+    ext_pos = *nextcf+1;
     for (i = 0; i < ne_l; i++) {  // for all elements in the process
         for (j = 0; j < 6; j++) {  // for all neighbors of this element
             id = (*lcc)[i][j];  // get the global id for this neighbor
@@ -527,8 +537,7 @@ int comm_model(int ne_l, int ne_g, int*** lcc, int** local_global_index, int** g
                     (*send_list)[p_n][p] = (*local_global_index)[i];
                     (*recv_list)[p_n][p] = id;
                     send_list_pos[p_n]++;  // increase send_list_count
-                    lcc_n[i][j] = ne_l + k; // this is not correct
-                    k++;
+                    lcc_n[i][j] = *nextci + send_count_cum[p_n] + p;
                 } else {
                     lcc_n[i][j] = (*global_local_index)[id];
                 }
