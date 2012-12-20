@@ -96,7 +96,7 @@ int compute_solution(const int max_iters, int nintci, int nintcf, int nextci, in
         for (nc = nintci; nc <= nintcf; nc++) {
             direc1[nc] = direc1[nc] + resvec[nc] * cgup[nc];
         }
-
+/*
         // send and receive the ghost cells
         for (i = 0; i < num_procs; i++) {
             MPI_Isend(&direc1[nintci], 1, type[i], i, 1, MPI_COMM_WORLD, &req_s[i]);
@@ -107,7 +107,7 @@ int compute_solution(const int max_iters, int nintci, int nintcf, int nextci, in
         }
         MPI_Waitall(num_procs, req_s, status_s);
         MPI_Waitall(num_procs, req_r, status_r);
-
+*/
         // compute new guess (approximation) for direc
         for (nc = nintci; nc <= nintcf; nc++) {
             direc2[nc] = bp[nc] * direc1[nc] - bs[nc] * direc1[lcc[nc][0]]

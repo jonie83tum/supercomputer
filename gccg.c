@@ -117,30 +117,11 @@ int main(int argc, char *argv[]) {
             num_global_elem);
 
     /********** END COMPUTATIONAL LOOP *******/
-    // prepare for finalization
-    double *var_g, *cgup_g, *su_g;
-    if (my_rank == 0) {
-        // allocat memory for the global vectors var, cgup and su
 
-        var_g = (double*) calloc(sizeof(double), num_global_elem);
-        cgup_g = (double*) calloc(sizeof(double), num_global_elem);
-        su_g = (double*) calloc(sizeof(double), num_global_elem);
-        printf("num_global_elem=%d\n", num_global_elem);
-    }
-    int i;
-    double check;
-    for (i = 0; i <= nintcf; i++) {
-        check = su[i];
-    }
-
-    // MPI_Gather(var, nintcf + 1, MPI_DOUBLE, var_g, num_global_elem, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    // MPI_Gather(cgup, nintcf + 1, MPI_DOUBLE, cgup_g, num_global_elem, MPI_DOUBLE, 0,
-    //        MPI_COMM_WORLD);
-    // MPI_Gather(su, nintcf + 1, MPI_DOUBLE, su_g, num_global_elem, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     /********** START FINALIZATION **********/
-    /*   finalization(file_in, out_prefix, total_iters, residual_ratio, nintci, nintcf, points_count,
-     points, elems, var, cgup, su);
-     // END FINALIZATION **********/
+  /*  finalization(file_in, out_prefix, total_iters, residual_ratio, nintci, nintcf, points_count,
+            points, elems, var, cgup, su);
+    // END FINALIZATION **********/
 
     /*
      free(cnorm);
