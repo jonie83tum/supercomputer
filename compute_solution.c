@@ -21,7 +21,7 @@ int compute_solution(const int max_iters, int nintci, int nintcf, int nextci, in
     int nor = 1;
     int nor1 = nor - 1;
     int nc = 0;
-    int i, j;
+    int i, j, id;
 
     int my_rank, num_procs;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);  // Get current process id
@@ -78,36 +78,35 @@ int compute_solution(const int max_iters, int nintci, int nintcf, int nextci, in
 
     // prepare packing
     for (i = 0; i < num_procs; i++) {
-        MPI_Type_indexed(send_count[i], len[i], send_list[i], MPI_INT, &type[i]);
+        MPI_Type_indexed(send_count[i], len[i], send_list[i], MPI_DOUBLE, &type[i]);
         MPI_Type_commit(&type[i]);
     }
     // vector for receiving the packed values
     int *send_count_cum;
     send_count_cum = (int*) calloc(sizeof(int), num_procs);
-    for (i = 0; i < num_procs; i++) {
-        if (i != 0) {
-            send_count_cum[i] = send_count_cum[i - 1] + send_count[i - 1];
-        }
+    for (i = 1; i < num_procs; i++) {
+        send_count_cum[i] = send_count_cum[i - 1] + send_count[i - 1];
     }
 
+    MPI_Barrier(MPI_COMM_WORLD);
     while (iter < max_iters) {
         //  START COMP PHASE 1
         // update the old values of direc
         for (nc = nintci; nc <= nintcf; nc++) {
             direc1[nc] = direc1[nc] + resvec[nc] * cgup[nc];
         }
-/*
+
         // send and receive the ghost cells
         for (i = 0; i < num_procs; i++) {
             MPI_Isend(&direc1[nintci], 1, type[i], i, 1, MPI_COMM_WORLD, &req_s[i]);
         }
         for (i = 0; i < num_procs; i++) {
-            MPI_Irecv(&direc1[nextci + send_count_cum[i]], recv_count[i], MPI_INT, i, 1,
+            MPI_Irecv(&direc1[nextci + send_count_cum[i]], send_count[i], MPI_DOUBLE, i, 1,
                     MPI_COMM_WORLD, &req_r[i]);
         }
         MPI_Waitall(num_procs, req_s, status_s);
         MPI_Waitall(num_procs, req_r, status_r);
-*/
+
         // compute new guess (approximation) for direc
         for (nc = nintci; nc <= nintcf; nc++) {
             direc2[nc] = bp[nc] * direc1[nc] - bs[nc] * direc1[lcc[nc][0]]
@@ -127,7 +126,7 @@ int compute_solution(const int max_iters, int nintci, int nintcf, int nextci, in
             for (nc = nintci; nc <= nintcf; nc++) {
                 occ = occ + adxor1[nc] * direc2[nc];
             }
-            MPI_Allreduce(&occ, &occ, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+            MPI_Allreduce(&occ, &occ, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
             oc1 = occ / cnorm[1];
             for (nc = nintci; nc <= nintcf; nc++) {
@@ -144,7 +143,7 @@ int compute_solution(const int max_iters, int nintci, int nintcf, int nextci, in
                 for (nc = nintci; nc <= nintcf; nc++) {
                     occ = occ + adxor1[nc] * direc2[nc];
                 }
-                MPI_Allreduce(&occ, &occ, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+                MPI_Allreduce(&occ, &occ, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
                 oc1 = occ / cnorm[1];
                 oc2 = 0;
@@ -152,7 +151,7 @@ int compute_solution(const int max_iters, int nintci, int nintcf, int nextci, in
                 for (nc = nintci; nc <= nintcf; nc++) {
                     occ = occ + adxor2[nc] * direc2[nc];
                 }
-                MPI_Allreduce(&occ, &occ, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+                MPI_Allreduce(&occ, &occ, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
                 oc2 = occ / cnorm[2];
                 for (nc = nintci; nc <= nintcf; nc++) {
@@ -171,8 +170,7 @@ int compute_solution(const int max_iters, int nintci, int nintcf, int nextci, in
             cnorm[nor] = cnorm[nor] + direc2[nc] * direc2[nc];
             omega = omega + resvec[nc] * direc2[nc];
         }
-        MPI_Allreduce(&omega, &omega, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
-
+        MPI_Allreduce(&omega, &omega, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
         omega = omega / cnorm[nor];
         double res_updated = 0.0;
@@ -181,8 +179,7 @@ int compute_solution(const int max_iters, int nintci, int nintcf, int nextci, in
             resvec[nc] = resvec[nc] - omega * direc2[nc];
             res_updated = res_updated + resvec[nc] * resvec[nc];
         }
-        MPI_Allreduce(&res_updated, &res_updated, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
-
+        MPI_Allreduce(&res_updated, &res_updated, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
         res_updated = sqrt(res_updated);
         *residual_ratio = res_updated / resref;

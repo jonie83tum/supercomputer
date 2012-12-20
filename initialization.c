@@ -353,7 +353,7 @@ int initialization(char* file_in, char* part_type, int* nintci, int* nintcf, int
 
     for (i = 0; i <= 10; i++) {
         // (*oc)[i] = 0.0;
-        (*cnorm)[i] = 1.0;  // only the firt 3 elements have to be one on each proseccor
+        (*cnorm)[i] = 1.0;  // only the first 3 elements have to be one on each proseccor
     }
     /*
      for (i = 0; i < (*nintcf); i++) {
@@ -526,7 +526,7 @@ int comm_model(int ne_l, int ne_g, int*** lcc, int** local_global_index, int** g
     // fill the send list
     int p;
     k = 0;
-    ext_pos = *nextcf+1;
+    ext_pos = *nextcf + 1;
     for (i = 0; i < ne_l; i++) {  // for all elements in the process
         for (j = 0; j < 6; j++) {  // for all neighbors of this element
             id = (*lcc)[i][j];  // get the global id for this neighbor
@@ -534,8 +534,9 @@ int comm_model(int ne_l, int ne_g, int*** lcc, int** local_global_index, int** g
                 p_n = (*epart)[id];  // get the process of this neighbor
                 if (p_n != my_rank) {  // check whether it is an element of another process
                     p = send_list_pos[p_n];
-                    (*send_list)[p_n][p] = (*local_global_index)[i];
-                    (*recv_list)[p_n][p] = id;
+                    // (*send_list)[p_n][p] = (*local_global_index)[i]; // fill send_list with global id
+                    (*send_list)[p_n][p] = i;  // fill send list with local id
+                    (*recv_list)[p_n][p] = id; // fill recv_list with global id
                     send_list_pos[p_n]++;  // increase send_list_count
                     lcc_n[i][j] = *nextci + send_count_cum[p_n] + p;
                 } else {

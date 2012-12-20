@@ -18,7 +18,7 @@
 int main(int argc, char *argv[]) {
     int my_rank, num_procs;
 
-    const int max_iters = 3;  /// maximum number of iteration to perform
+    const int max_iters = 10;  /// maximum number of iteration to perform
 
     /** Simulation parameters parsed from the input datasets */
     int nintci, nintcf;  /// internal cells start and end index
@@ -119,8 +119,12 @@ int main(int argc, char *argv[]) {
     /********** END COMPUTATIONAL LOOP *******/
 
     /********** START FINALIZATION **********/
-  /*  finalization(file_in, out_prefix, total_iters, residual_ratio, nintci, nintcf, points_count,
-            points, elems, var, cgup, su);
+    char out_prefix_fin[200];
+    sprintf(out_prefix_fin, "%s_p%d", out_prefix, my_rank);
+
+    finalization(file_in, out_prefix_fin, total_iters, residual_ratio, nintci, nintcf, points_count,
+            points, elems, var, cgup, su, num_global_elem, local_global_index);
+
     // END FINALIZATION **********/
 
     /*
