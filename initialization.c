@@ -554,16 +554,15 @@ int comm_model(int ne_l, int ne_g, int*** lcc, int** local_global_index, int** g
         }
     }
 
-    /*!!!!!!! use global lcc !!!!!!!!
-     // free the memory of the global LCC vector
-     for (int i = 0; i < ne_l; i++) {
-     free((*lcc)[i]);
-     }
-     free(*lcc);
-     // set the original pointer to the new lcc pointer
-     *lcc = lcc_n;
+    // free the memory of the global LCC vector
+    for (int i = 0; i < ne_l; i++) {
+        free((*lcc)[i]);
+    }
+    free(*lcc);
+    // set the original pointer to the new lcc pointer
+    *lcc = lcc_n;
 
-     /*
+    /*
      // allocating recv_list
      if ((*recv_list = (int**) malloc(num_procs * sizeof(int*))) == NULL ) {
      fprintf(stderr, "malloc failed to allocate first dimension of LCC");
@@ -578,25 +577,24 @@ int comm_model(int ne_l, int ne_g, int*** lcc, int** local_global_index, int** g
      }
      */
 
-     MPI_Request req_s[num_procs];
-     MPI_Request req_r[num_procs];
-     MPI_Status status_s[num_procs];
-     MPI_Status status_r[num_procs];
+    MPI_Request req_s[num_procs];
+    MPI_Request req_r[num_procs];
+    MPI_Status status_s[num_procs];
+    MPI_Status status_r[num_procs];
 
-     for (i = 0; i < num_procs; i++) {
+    for (i = 0; i < num_procs; i++) {
 
-     MPI_Isend(&(*send_list)[i][0], (*send_count)[i], MPI_INT, i, 1, MPI_COMM_WORLD, &req_s[i]);
+        MPI_Isend(&(*send_list)[i][0], (*send_count)[i], MPI_INT, i, 1, MPI_COMM_WORLD, &req_s[i]);
 
-     }
+    }
 
-     for (i = 0; i < num_procs; i++) {
+    for (i = 0; i < num_procs; i++) {
 
-     MPI_Irecv(&(*recv_list)[i][0], (*recv_count)[i], MPI_INT, i, 1, MPI_COMM_WORLD, &req_r[i]);
+        MPI_Irecv(&(*recv_list)[i][0], (*recv_count)[i], MPI_INT, i, 1, MPI_COMM_WORLD, &req_r[i]);
 
-     }
-     MPI_Waitall(num_procs, req_s, status_s);
-     MPI_Waitall(num_procs, req_r, status_r);
-
+    }
+    MPI_Waitall(num_procs, req_s, status_s);
+    MPI_Waitall(num_procs, req_r, status_r);
 
     return 1;
 }

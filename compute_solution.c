@@ -85,12 +85,18 @@ int compute_solution(const int max_iters, int nintci, int nintcf, int nextci, in
         }
     }
 
+    for (i=0;i<num_procs;i++){
+        for (j=0;j<send_count[i];j++){
+            send_list[i][j]=global_local_index[send_list[i][j]];
+        }
+    }
+
     // prepare packing
     for (i = 0; i < num_procs; i++) {
         MPI_Type_indexed(send_count[i], len[i], send_list[i], MPI_DOUBLE, &type[i]);
-        MPI_Type_indexed(send_count[i], len[i], recv_list[i], MPI_DOUBLE, &type_r[i]);
+        MPI_Type_indexed(send_count[i], len[i], recv_list[i], MPI_DOUBLE, &type_r[i]);  // not needed for local direc1
         MPI_Type_commit(&type[i]);
-        MPI_Type_commit(&type_r[i]);
+        MPI_Type_commit(&type_r[i]);  // not needed for local direc1
     }
     // free len !!!!!!
     // vector for receiving the packed values, not needed for global direc1
@@ -105,7 +111,7 @@ int compute_solution(const int max_iters, int nintci, int nintcf, int nextci, in
         //  START COMP PHASE 1
         // update the old values of direc
         for (nc = nintci; nc <= nintcf; nc++) {
-            direc1[local_global_index[nc]] = direc1[local_global_index[nc]] + resvec[nc] * cgup[nc];
+            direc1[nc] = direc1[nc] + resvec[nc] * cgup[nc];
         }
 
         // send and receive the ghost cells
@@ -113,16 +119,16 @@ int compute_solution(const int max_iters, int nintci, int nintcf, int nextci, in
             MPI_Isend(&direc1[nintci], 1, type[i], i, 1, MPI_COMM_WORLD, &req_s[i]);
         }
         for (i = 0; i < num_procs; i++) {
-            MPI_Irecv(&direc1[nintci], 1, type_r[i], i, 1, MPI_COMM_WORLD, &req_r[i]);
-            // MPI_Irecv(&direc1[nextci + send_count_cum[i]], send_count[i], MPI_DOUBLE, i, 1,
-            //      MPI_COMM_WORLD, &req_r[i]);
+            // MPI_Irecv(&direc1[nintci], 1, type_r[i], i, 1, MPI_COMM_WORLD, &req_r[i]);
+            MPI_Irecv(&direc1[nextci + send_count_cum[i]], send_count[i], MPI_DOUBLE, i, 1,
+                    MPI_COMM_WORLD, &req_r[i]);
         }
         MPI_Waitall(num_procs, req_s, status_s);
         MPI_Waitall(num_procs, req_r, status_r);
         MPI_Barrier(MPI_COMM_WORLD);
         // compute new guess (approximation) for direc
         for (nc = nintci; nc <= nintcf; nc++) {
-            direc2[nc] = bp[nc] * direc1[local_global_index[nc]] - bs[nc] * direc1[lcc[nc][0]]
+            direc2[nc] = bp[nc] * direc1[nc] - bs[nc] * direc1[lcc[nc][0]]
                     - bw[nc] * direc1[lcc[nc][3]] - bl[nc] * direc1[lcc[nc][4]]
                     - bn[nc] * direc1[lcc[nc][2]] - be[nc] * direc1[lcc[nc][1]]
                     - bh[nc] * direc1[lcc[nc][5]];
@@ -144,7 +150,7 @@ int compute_solution(const int max_iters, int nintci, int nintcf, int nextci, in
             oc1 = occ / cnorm[1];
             for (nc = nintci; nc <= nintcf; nc++) {
                 direc2[nc] = direc2[nc] - oc1 * adxor1[nc];
-                direc1[local_global_index[nc]] = direc1[local_global_index[nc]] - oc1 * dxor1[nc];
+                direc1[nc] = direc1[nc] - oc1 * dxor1[nc];
             }
 
             if1++;
@@ -169,8 +175,7 @@ int compute_solution(const int max_iters, int nintci, int nintcf, int nextci, in
                 oc2 = occ / cnorm[2];
                 for (nc = nintci; nc <= nintcf; nc++) {
                     direc2[nc] = direc2[nc] - oc1 * adxor1[nc] - oc2 * adxor2[nc];
-                    direc1[local_global_index[nc]] = direc1[local_global_index[nc]]
-                            - oc1 * dxor1[nc] - oc2 * dxor2[nc];
+                    direc1[nc] = direc1[nc] - oc1 * dxor1[nc] - oc2 * dxor2[nc];
                 }
 
                 if2++;
@@ -190,7 +195,7 @@ int compute_solution(const int max_iters, int nintci, int nintcf, int nextci, in
         omega = omega / cnorm[nor];
         double res_updated = 0.0;
         for (nc = nintci; nc <= nintcf; nc++) {
-            var[nc] = var[nc] + omega * direc1[local_global_index[nc]];
+            var[nc] = var[nc] + omega * direc1[nc];
             resvec[nc] = resvec[nc] - omega * direc2[nc];
             res_updated = res_updated + resvec[nc] * resvec[nc];
         }
@@ -211,13 +216,13 @@ int compute_solution(const int max_iters, int nintci, int nintcf, int nextci, in
         } else {
             if (nor == 1) {
                 for (nc = nintci; nc <= nintcf; nc++) {
-                    dxor1[nc] = direc1[local_global_index[nc]];
+                    dxor1[nc] = direc1[nc];
                     adxor1[nc] = direc2[nc];
                 }
             } else {
                 if (nor == 2) {
                     for (nc = nintci; nc <= nintcf; nc++) {
-                        dxor2[nc] = direc1[local_global_index[nc]];
+                        dxor2[nc] = direc1[nc];
                         adxor2[nc] = direc2[nc];
                     }
                 }
