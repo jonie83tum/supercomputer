@@ -37,9 +37,6 @@ int initialization(char* file_in, char* part_type, int* nintci, int* nintcf, int
     int num_elem_g = *nintcf - *nintci + 1;
     *num_global_elem = num_elem_g;
     *num_all_elem = *nextcf;
-    if (my_rank == 0) {
-        printf("nintci=%d,nintcf=%d,nextci=%d,nextcf=%d\n", *nintci, *nintcf, *nextci, *nextcf);
-    }
 
     // classical partitioning
     if (strcmp(part_type, "classical") == 0) {
@@ -540,7 +537,7 @@ int comm_model(int ne_l, int ne_g, int*** lcc, int** local_global_index, int** g
                 p_n = (*epart)[id];  // get the process of this neighbor
                 if (p_n != my_rank) {  // check whether it is an element of another process
                     p = send_list_pos[p_n];
-                    (*send_list)[p_n][p] = (*local_global_index)[i]; // fill send_list with global id
+                    (*send_list)[p_n][p] = (*local_global_index)[i];  // fill send_list with global id
                     // (*send_list)[p_n][p] = i;  // fill send list with local id
                     // (*recv_list)[p_n][p] = id;  // fill recv_list with global id
                     lcc_n[i][j] = *nextci + send_count_cum[p_n] + p;
@@ -578,25 +575,24 @@ int comm_model(int ne_l, int ne_g, int*** lcc, int** local_global_index, int** g
      }
      */
 
-     MPI_Request req_s[num_procs];
-     MPI_Request req_r[num_procs];
-     MPI_Status status_s[num_procs];
-     MPI_Status status_r[num_procs];
+    MPI_Request req_s[num_procs];
+    MPI_Request req_r[num_procs];
+    MPI_Status status_s[num_procs];
+    MPI_Status status_r[num_procs];
 
-     for (i = 0; i < num_procs; i++) {
+    for (i = 0; i < num_procs; i++) {
 
-     MPI_Isend(&(*send_list)[i][0], (*send_count)[i], MPI_INT, i, 1, MPI_COMM_WORLD, &req_s[i]);
+        MPI_Isend(&(*send_list)[i][0], (*send_count)[i], MPI_INT, i, 1, MPI_COMM_WORLD, &req_s[i]);
 
-     }
+    }
 
-     for (i = 0; i < num_procs; i++) {
+    for (i = 0; i < num_procs; i++) {
 
-     MPI_Irecv(&(*recv_list)[i][0], (*recv_count)[i], MPI_INT, i, 1, MPI_COMM_WORLD, &req_r[i]);
+        MPI_Irecv(&(*recv_list)[i][0], (*recv_count)[i], MPI_INT, i, 1, MPI_COMM_WORLD, &req_r[i]);
 
-     }
-     MPI_Waitall(num_procs, req_s, status_s);
-     MPI_Waitall(num_procs, req_r, status_r);
-
+    }
+    MPI_Waitall(num_procs, req_s, status_s);
+    MPI_Waitall(num_procs, req_r, status_r);
 
     return 1;
 }

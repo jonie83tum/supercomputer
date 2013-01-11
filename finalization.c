@@ -8,6 +8,8 @@
 #include <stdio.h>
 #include "util_write_files.h"
 #include "mpi.h"
+#include "finalization.h"
+#include <stdlib.h>
 
 void finalization(char* file_in, char* out_prefix, int total_iters, double residual_ratio,
         int nintci, int nintcf, int points_count, int** points, int* elems, double* var,

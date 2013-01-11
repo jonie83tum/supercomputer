@@ -60,11 +60,6 @@ int compute_solution(const int max_iters, int nintci, int nintcf, int nextci, in
     // calcualte size of direc vectors (internal cells + ghost cells + neighboring external cells)
 
     // the computation vectors
-    if (my_rank == 0) {
-        printf("nextcf=%d\n", nextcf);
-        printf("num_all_elem%d\n", num_all_elem);
-    }
-
     // double *direc1 = (double *) calloc(sizeof(double), (nextcf + 2));  // +2 because last entry = 0 (ext cell)
     double *direc1 = (double *) calloc(sizeof(double), num_all_elem);  // keep direc1 as an global array
     double *direc2 = (double *) calloc(sizeof(double), (nextcf + 1));  // nintcf would be enough
