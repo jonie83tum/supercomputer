@@ -48,6 +48,8 @@ int compute_solution(const int max_iters, int nintci, int nintcf, int nextci, in
         resref = resref + resvec[nc] * resvec[nc];
     }
 
+    MPI_Allreduce(&resref, &resref, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+
     resref = sqrt(resref);
     if (resref < 1.0e-15) {
         fprintf(stderr, "Residue sum less than 1.e-15 - %lf\n", resref);
@@ -57,6 +59,11 @@ int compute_solution(const int max_iters, int nintci, int nintcf, int nextci, in
     // calcualte size of direc vectors (internal cells + ghost cells + neighboring external cells)
 
     // the computation vectors
+    if (my_rank == 0) {
+        printf("nextcf=%d\n", nextcf);
+    }
+    printf("nextcf for p%d = %d\n",my_rank, nextcf);
+
     double *direc1 = (double *) calloc(sizeof(double), (nextcf + 2));  // +2 because last entry = 0 (ext cell)
     double *direc2 = (double *) calloc(sizeof(double), (nextcf + 1));  // nintcf would be enough
     double *adxor1 = (double *) calloc(sizeof(double), (nintcf + 1));
@@ -64,6 +71,12 @@ int compute_solution(const int max_iters, int nintci, int nintcf, int nextci, in
     double *dxor1 = (double *) calloc(sizeof(double), (nintcf + 1));
     double *dxor2 = (double *) calloc(sizeof(double), (nintcf + 1));
 
+    if (my_rank == 0) {
+        for (i = nextcf - 5; i <= nextcf + 5; i++) {
+            printf("direc1[%d]=%16.15f\n", i, direc1[i]);
+        }
+        printf("nextcf=%d\n", nextcf);
+    }
     // arrays for data exchange
     int **len;
     len = (int**) calloc(sizeof(int), num_procs);
@@ -106,7 +119,7 @@ int compute_solution(const int max_iters, int nintci, int nintcf, int nextci, in
         }
         MPI_Waitall(num_procs, req_s, status_s);
         MPI_Waitall(num_procs, req_r, status_r);
-
+        MPI_Barrier(MPI_COMM_WORLD);
         // compute new guess (approximation) for direc
         for (nc = nintci; nc <= nintcf; nc++) {
             direc2[nc] = bp[nc] * direc1[nc] - bs[nc] * direc1[lcc[nc][0]]
@@ -171,6 +184,7 @@ int compute_solution(const int max_iters, int nintci, int nintcf, int nextci, in
             omega = omega + resvec[nc] * direc2[nc];
         }
         MPI_Allreduce(&omega, &omega, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+        MPI_Allreduce(&cnorm[nor], &cnorm[nor], 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
         omega = omega / cnorm[nor];
         double res_updated = 0.0;

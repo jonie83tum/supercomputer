@@ -374,8 +374,11 @@ int initialization(char* file_in, char* part_type, int* nintci, int* nintcf, int
      (*bh)[i] = 0.0;
      }
      */
-    for (i = 0; i <= (*nintcf); i++)
+
+    for (i = 0; i <= (*nintcf); i++) {
         (*cgup)[i] = 1.0 / ((*bp)[i]);
+
+    }
 
     return 0;
 }
@@ -426,7 +429,7 @@ int allocate_local_arrays(double **BS_l, double **BE_l, double **BN_l, double **
 int comm_model(int ne_l, int ne_g, int*** lcc, int** local_global_index, int** global_local_index,
         int* neighbors_count, int** send_count, int*** send_list, int** recv_count,
         int*** recv_list, int** epart, int* nextci, int* nextcf) {
-    int i, j, id, k, total_send_recv, ext_pos;
+    int i, j, id, total_send_recv, ext_pos;
     int my_rank, num_procs;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);  // Get current process id
     MPI_Comm_size(MPI_COMM_WORLD, &num_procs);  // get number of processes
@@ -525,20 +528,19 @@ int comm_model(int ne_l, int ne_g, int*** lcc, int** local_global_index, int** g
 
     // fill the send list
     int p;
-    k = 0;
     ext_pos = *nextcf + 1;
     for (i = 0; i < ne_l; i++) {  // for all elements in the process
         for (j = 0; j < 6; j++) {  // for all neighbors of this element
             id = (*lcc)[i][j];  // get the global id for this neighbor
-            if (id < ne_g) {  // get whether the neighbor is an external cell
+            if (id < ne_g) {  // get whether the neighbor is an internal cell
                 p_n = (*epart)[id];  // get the process of this neighbor
                 if (p_n != my_rank) {  // check whether it is an element of another process
                     p = send_list_pos[p_n];
                     // (*send_list)[p_n][p] = (*local_global_index)[i]; // fill send_list with global id
                     (*send_list)[p_n][p] = i;  // fill send list with local id
-                    (*recv_list)[p_n][p] = id; // fill recv_list with global id
-                    send_list_pos[p_n]++;  // increase send_list_count
+                    (*recv_list)[p_n][p] = id;  // fill recv_list with global id
                     lcc_n[i][j] = *nextci + send_count_cum[p_n] + p;
+                    send_list_pos[p_n]++;  // increase send_list_count
                 } else {
                     lcc_n[i][j] = (*global_local_index)[id];
                 }
@@ -547,6 +549,7 @@ int comm_model(int ne_l, int ne_g, int*** lcc, int** local_global_index, int** g
             }
         }
     }
+
 
     // free the memory of the global LCC vector
     for (int i = 0; i < ne_l; i++) {
