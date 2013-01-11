@@ -20,7 +20,7 @@ int initialization(char* file_in, char* part_type, int* nintci, int* nintcf, int
         double** var, double** cgup, double** oc, double** cnorm, int** local_global_index,
         int** global_local_index, int* neighbors_count, int** send_count, int*** send_list,
         int** recv_count, int*** recv_list, int** epart, int** npart, int* objval,
-        int* num_global_elem) {
+        int* num_global_elem, int* num_all_elem) {
     /********** START INITIALIZATION **********/
 
     int i = 0;
@@ -36,6 +36,10 @@ int initialization(char* file_in, char* part_type, int* nintci, int* nintcf, int
     MPI_Comm_size(MPI_COMM_WORLD, &num_procs);  // get number of processes
     int num_elem_g = *nintcf - *nintci + 1;
     *num_global_elem = num_elem_g;
+    *num_all_elem = *nextcf;
+    if (my_rank == 0) {
+        printf("nintci=%d,nintcf=%d,nextci=%d,nextcf=%d\n", *nintci, *nintcf, *nextci, *nextcf);
+    }
 
     // classical partitioning
     if (strcmp(part_type, "classical") == 0) {
@@ -536,9 +540,9 @@ int comm_model(int ne_l, int ne_g, int*** lcc, int** local_global_index, int** g
                 p_n = (*epart)[id];  // get the process of this neighbor
                 if (p_n != my_rank) {  // check whether it is an element of another process
                     p = send_list_pos[p_n];
-                    // (*send_list)[p_n][p] = (*local_global_index)[i]; // fill send_list with global id
-                    (*send_list)[p_n][p] = i;  // fill send list with local id
-                    (*recv_list)[p_n][p] = id;  // fill recv_list with global id
+                    (*send_list)[p_n][p] = (*local_global_index)[i]; // fill send_list with global id
+                    // (*send_list)[p_n][p] = i;  // fill send list with local id
+                    // (*recv_list)[p_n][p] = id;  // fill recv_list with global id
                     lcc_n[i][j] = *nextci + send_count_cum[p_n] + p;
                     send_list_pos[p_n]++;  // increase send_list_count
                 } else {
@@ -550,16 +554,16 @@ int comm_model(int ne_l, int ne_g, int*** lcc, int** local_global_index, int** g
         }
     }
 
+    /*!!!!!!! use global lcc !!!!!!!!
+     // free the memory of the global LCC vector
+     for (int i = 0; i < ne_l; i++) {
+     free((*lcc)[i]);
+     }
+     free(*lcc);
+     // set the original pointer to the new lcc pointer
+     *lcc = lcc_n;
 
-    // free the memory of the global LCC vector
-    for (int i = 0; i < ne_l; i++) {
-        free((*lcc)[i]);
-    }
-    free(*lcc);
-    // set the original pointer to the new lcc pointer
-    *lcc = lcc_n;
-
-    /*
+     /*
      // allocating recv_list
      if ((*recv_list = (int**) malloc(num_procs * sizeof(int*))) == NULL ) {
      fprintf(stderr, "malloc failed to allocate first dimension of LCC");
@@ -573,7 +577,7 @@ int comm_model(int ne_l, int ne_g, int*** lcc, int** local_global_index, int** g
      }
      }
      */
-    /*
+
      MPI_Request req_s[num_procs];
      MPI_Request req_r[num_procs];
      MPI_Status status_s[num_procs];
@@ -592,7 +596,7 @@ int comm_model(int ne_l, int ne_g, int*** lcc, int** local_global_index, int** g
      }
      MPI_Waitall(num_procs, req_s, status_s);
      MPI_Waitall(num_procs, req_r, status_r);
-     */
+
 
     return 1;
 }

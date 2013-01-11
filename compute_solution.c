@@ -14,19 +14,20 @@ int compute_solution(const int max_iters, int nintci, int nintcf, int nextci, in
         double* bp, double* bs, double* bw, double* bl, double* bn, double* be, double* bh,
         double* cnorm, double* var, double *su, double* cgup, double* residual_ratio,
         int* local_global_index, int* global_local_index, int neighbors_count, int* send_count,
-        int** send_list, int* recv_count, int** recv_list, int num_global_elem) {
+        int** send_list, int* recv_count, int** recv_list, int num_global_elem, int num_all_elem) {
     int iter = 1;
     int if1 = 0;
     int if2 = 0;
     int nor = 1;
     int nor1 = nor - 1;
     int nc = 0;
-    int i, j, id;
+    int i, j;
 
     int my_rank, num_procs;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);  // Get current process id
     MPI_Comm_size(MPI_COMM_WORLD, &num_procs);  // get number of processes
     MPI_Datatype type[num_procs];
+    MPI_Datatype type_r[num_procs];
 
     MPI_Request req_s[num_procs];
     MPI_Request req_r[num_procs];
@@ -61,22 +62,17 @@ int compute_solution(const int max_iters, int nintci, int nintcf, int nextci, in
     // the computation vectors
     if (my_rank == 0) {
         printf("nextcf=%d\n", nextcf);
+        printf("num_all_elem%d\n", num_all_elem);
     }
-    printf("nextcf for p%d = %d\n",my_rank, nextcf);
 
-    double *direc1 = (double *) calloc(sizeof(double), (nextcf + 2));  // +2 because last entry = 0 (ext cell)
+    // double *direc1 = (double *) calloc(sizeof(double), (nextcf + 2));  // +2 because last entry = 0 (ext cell)
+    double *direc1 = (double *) calloc(sizeof(double), num_all_elem);  // keep direc1 as an global array
     double *direc2 = (double *) calloc(sizeof(double), (nextcf + 1));  // nintcf would be enough
     double *adxor1 = (double *) calloc(sizeof(double), (nintcf + 1));
     double *adxor2 = (double *) calloc(sizeof(double), (nintcf + 1));
     double *dxor1 = (double *) calloc(sizeof(double), (nintcf + 1));
     double *dxor2 = (double *) calloc(sizeof(double), (nintcf + 1));
 
-    if (my_rank == 0) {
-        for (i = nextcf - 5; i <= nextcf + 5; i++) {
-            printf("direc1[%d]=%16.15f\n", i, direc1[i]);
-        }
-        printf("nextcf=%d\n", nextcf);
-    }
     // arrays for data exchange
     int **len;
     len = (int**) calloc(sizeof(int), num_procs);
@@ -92,9 +88,12 @@ int compute_solution(const int max_iters, int nintci, int nintcf, int nextci, in
     // prepare packing
     for (i = 0; i < num_procs; i++) {
         MPI_Type_indexed(send_count[i], len[i], send_list[i], MPI_DOUBLE, &type[i]);
+        MPI_Type_indexed(send_count[i], len[i], recv_list[i], MPI_DOUBLE, &type_r[i]);
         MPI_Type_commit(&type[i]);
+        MPI_Type_commit(&type_r[i]);
     }
-    // vector for receiving the packed values
+    // free len !!!!!!
+    // vector for receiving the packed values, not needed for global direc1
     int *send_count_cum;
     send_count_cum = (int*) calloc(sizeof(int), num_procs);
     for (i = 1; i < num_procs; i++) {
@@ -106,7 +105,7 @@ int compute_solution(const int max_iters, int nintci, int nintcf, int nextci, in
         //  START COMP PHASE 1
         // update the old values of direc
         for (nc = nintci; nc <= nintcf; nc++) {
-            direc1[nc] = direc1[nc] + resvec[nc] * cgup[nc];
+            direc1[local_global_index[nc]] = direc1[local_global_index[nc]] + resvec[nc] * cgup[nc];
         }
 
         // send and receive the ghost cells
@@ -114,15 +113,16 @@ int compute_solution(const int max_iters, int nintci, int nintcf, int nextci, in
             MPI_Isend(&direc1[nintci], 1, type[i], i, 1, MPI_COMM_WORLD, &req_s[i]);
         }
         for (i = 0; i < num_procs; i++) {
-            MPI_Irecv(&direc1[nextci + send_count_cum[i]], send_count[i], MPI_DOUBLE, i, 1,
-                    MPI_COMM_WORLD, &req_r[i]);
+            MPI_Irecv(&direc1[nintci], 1, type_r[i], i, 1, MPI_COMM_WORLD, &req_r[i]);
+            // MPI_Irecv(&direc1[nextci + send_count_cum[i]], send_count[i], MPI_DOUBLE, i, 1,
+            //      MPI_COMM_WORLD, &req_r[i]);
         }
         MPI_Waitall(num_procs, req_s, status_s);
         MPI_Waitall(num_procs, req_r, status_r);
         MPI_Barrier(MPI_COMM_WORLD);
         // compute new guess (approximation) for direc
         for (nc = nintci; nc <= nintcf; nc++) {
-            direc2[nc] = bp[nc] * direc1[nc] - bs[nc] * direc1[lcc[nc][0]]
+            direc2[nc] = bp[nc] * direc1[local_global_index[nc]] - bs[nc] * direc1[lcc[nc][0]]
                     - bw[nc] * direc1[lcc[nc][3]] - bl[nc] * direc1[lcc[nc][4]]
                     - bn[nc] * direc1[lcc[nc][2]] - be[nc] * direc1[lcc[nc][1]]
                     - bh[nc] * direc1[lcc[nc][5]];
@@ -144,7 +144,7 @@ int compute_solution(const int max_iters, int nintci, int nintcf, int nextci, in
             oc1 = occ / cnorm[1];
             for (nc = nintci; nc <= nintcf; nc++) {
                 direc2[nc] = direc2[nc] - oc1 * adxor1[nc];
-                direc1[nc] = direc1[nc] - oc1 * dxor1[nc];
+                direc1[local_global_index[nc]] = direc1[local_global_index[nc]] - oc1 * dxor1[nc];
             }
 
             if1++;
@@ -169,7 +169,8 @@ int compute_solution(const int max_iters, int nintci, int nintcf, int nextci, in
                 oc2 = occ / cnorm[2];
                 for (nc = nintci; nc <= nintcf; nc++) {
                     direc2[nc] = direc2[nc] - oc1 * adxor1[nc] - oc2 * adxor2[nc];
-                    direc1[nc] = direc1[nc] - oc1 * dxor1[nc] - oc2 * dxor2[nc];
+                    direc1[local_global_index[nc]] = direc1[local_global_index[nc]]
+                            - oc1 * dxor1[nc] - oc2 * dxor2[nc];
                 }
 
                 if2++;
@@ -189,7 +190,7 @@ int compute_solution(const int max_iters, int nintci, int nintcf, int nextci, in
         omega = omega / cnorm[nor];
         double res_updated = 0.0;
         for (nc = nintci; nc <= nintcf; nc++) {
-            var[nc] = var[nc] + omega * direc1[nc];
+            var[nc] = var[nc] + omega * direc1[local_global_index[nc]];
             resvec[nc] = resvec[nc] - omega * direc2[nc];
             res_updated = res_updated + resvec[nc] * resvec[nc];
         }
@@ -210,13 +211,13 @@ int compute_solution(const int max_iters, int nintci, int nintcf, int nextci, in
         } else {
             if (nor == 1) {
                 for (nc = nintci; nc <= nintcf; nc++) {
-                    dxor1[nc] = direc1[nc];
+                    dxor1[nc] = direc1[local_global_index[nc]];
                     adxor1[nc] = direc2[nc];
                 }
             } else {
                 if (nor == 2) {
                     for (nc = nintci; nc <= nintcf; nc++) {
-                        dxor2[nc] = direc1[nc];
+                        dxor2[nc] = direc1[local_global_index[nc]];
                         adxor2[nc] = direc2[nc];
                     }
                 }

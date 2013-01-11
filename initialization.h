@@ -14,7 +14,7 @@ int initialization(char* file_in, char* part_type, int* nintci, int* nintcf, int
         double** var, double** cgup, double** oc, double** cnorm, int** local_global_index,
         int** global_local_index, int* neighbors_count, int** send_count, int*** send_list,
         int** recv_count, int*** recv_list, int** epart, int** npart, int* objval,
-        int* num_global_elem);
+        int* num_global_elem, int* num_all_elem);
 
 #endif /* INITIALIZATION_H_ */
 

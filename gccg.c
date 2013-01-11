@@ -59,6 +59,7 @@ int main(int argc, char *argv[]) {
     int* npart;  /// partition vector for the points (nodes) of the mesh
     int objval;  /// resulting edgecut of total communication volume (classical distrib->zeros)
     int num_global_elem;  // global number on internal elements
+    int num_all_elem; // number of all elements (internal + external)
 
     MPI_Init(&argc, &argv);  /// Start MPI
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);  /// Get current process id
@@ -78,7 +79,7 @@ int main(int argc, char *argv[]) {
     int init_status = initialization(file_in, part_type, &nintci, &nintcf, &nextci, &nextcf, &lcc,
             &bs, &be, &bn, &bw, &bl, &bh, &bp, &su, &points_count, &points, &elems, &var, &cgup,
             &oc, &cnorm, &local_global_index, &global_local_index, &neighbors_count, &send_count,
-            &send_list, &recv_count, &recv_list, &epart, &npart, &objval, &num_global_elem);
+            &send_list, &recv_count, &recv_list, &epart, &npart, &objval, &num_global_elem, &num_all_elem);
 
     if (init_status != 0) {
         fprintf(stderr, "Failed to initialize data!\n");
@@ -96,7 +97,7 @@ int main(int argc, char *argv[]) {
      test_distribution(file_in, file_vtk_out, local_global_index, nintcf, cgup);
      }
      */
-    /*
+
      // Implement this function in test_functions.c and call it here
      if (my_rank == 0) {
      // char file_vtk_out[256];
@@ -106,15 +107,18 @@ int main(int argc, char *argv[]) {
      test_communication(file_in, file_vtk_out, local_global_index, num_elems, neighbors_count,
      send_count, send_list, recv_count, recv_list);
      }
-     */
+
     /********** END INITIALIZATION **********/
 
     /********** START COMPUTATIONAL LOOP **********/
-
+    if (my_rank == 0) {
+        printf("nextcf=%d before call com sol\n", nextcf);
+        printf("num_all_elem=%d before cal com sol\n", num_all_elem);
+    }
     int total_iters = compute_solution(max_iters, nintci, nintcf, nextci, nextcf, lcc, bp, bs, bw,
             bl, bn, be, bh, cnorm, var, su, cgup, &residual_ratio, local_global_index,
             global_local_index, neighbors_count, send_count, send_list, recv_count, recv_list,
-            num_global_elem);
+            num_global_elem, num_all_elem);
 
     /********** END COMPUTATIONAL LOOP *******/
 

@@ -108,8 +108,8 @@ int test_communication(char *file_in, char *file_vtk_out, int *local_global_inde
     // set the elements which are to be sent
     for (i = 0; i < num_procs; i++) {  // for all neighbors in of this process
         for (j = 0; j < send_count[i]; j++) {  // for all elements in the list
-            id = send_list[i][j];  // get local id of the element to be sent
-            commlist[local_global_index[id]] = 10.0;
+            id = send_list[i][j];  // get global id of the element to be sent
+            commlist[id] = 10.0;
         }
     }
 
